@@ -146,38 +146,7 @@ jobs:
           # Очищаем временные файлы
           rm -rf "$DEPLOY_DIR"
           
-          # Обновляем конфигурацию Apache (mod_rewrite правила)
-          sudo bash -c "cat > /etc/apache2/sites-available/infotecha-modules.conf << 'EOF'
-<VirtualHost *:80>
-    ServerName infotecha.ru
-    ServerAlias *.infotecha.ru
-    DocumentRoot /var/www/infotecha.ru
-    
-    # Главная страница
-    <Directory /var/www/infotecha.ru>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-        DirectoryIndex index.html
-    </Directory>
-    
-    # Перенаправление поддоменов в соответствующие папки
-    RewriteEngine On
-    RewriteCond %{HTTP_HOST} ^([^.]+)\.infotecha\.ru$
-    RewriteCond %{DOCUMENT_ROOT}/%1 -d
-    RewriteRule ^/(.*) /%1/$1 [L]
-    
-    # Логи
-    ErrorLog \${APACHE_LOG_DIR}/infotecha_error.log
-    CustomLog \${APACHE_LOG_DIR}/infotecha_access.log combined
-</VirtualHost>
-EOF"
-          
-          # Включаем сайт и модуль rewrite
-          sudo a2enmod rewrite
-          sudo a2ensite infotecha-modules.conf
-          
-          # Перезагружаем Apache
+          # Перезагружаем Apache для применения изменений  
           sudo systemctl reload apache2
           
           echo "✅ Module $MODULE_NAME deployed successfully"
