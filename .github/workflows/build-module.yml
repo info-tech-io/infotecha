@@ -1,0 +1,184 @@
+name: Build Module
+
+on:
+  repository_dispatch:
+    types: [build-module]
+  workflow_dispatch:
+    inputs:
+      module_name:
+        description: 'Module name to build'
+        required: true
+        type: string
+      content_repo:
+        description: 'Content repository name'
+        required: true
+        type: string
+
+env:
+  MODULE_NAME: ${{ github.event.client_payload.module_name || github.event.inputs.module_name }}
+  CONTENT_REPO: ${{ github.event.client_payload.content_repo || github.event.inputs.content_repo }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout infotecha repository
+      uses: actions/checkout@v4
+      
+    - name: Checkout hugo-base template
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/hugo-base
+        path: hugo-base
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Checkout module content
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/${{ env.CONTENT_REPO }}
+        path: module-content
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Setup Hugo
+      uses: peaceiris/actions-hugo@v2
+      with:
+        hugo-version: '0.148.2'
+        extended: true
+        
+    - name: Build module site
+      run: |
+        echo "🏗️ Building module: ${{ env.MODULE_NAME }}"
+        
+        # Создаем рабочую директорию для сборки
+        mkdir -p build-workspace
+        cd build-workspace
+        
+        # Копируем шаблон hugo-base
+        cp -r ../hugo-base/* .
+        cp -r ../hugo-base/.* . 2>/dev/null || true
+        
+        # Заменяем контент модуля (если папка content есть в модуле)
+        if [ -d "../module-content/content" ]; then
+            echo "📂 Using content from module repository"
+            rm -rf content/
+            cp -r ../module-content/content/ ./
+        else
+            echo "⚠️ No content/ folder in module repository, using default"
+        fi
+        
+        # Обновляем конфигурацию Hugo для конкретного модуля
+        MODULE_SUBDOMAIN=$(jq -r --arg module "${{ env.MODULE_NAME }}" '.modules[$module].subdomain' ../modules.json)
+        MODULE_TITLE=$(jq -r --arg module "${{ env.MODULE_NAME }}" '.modules[$module].name' ../modules.json)
+        
+        # Обновляем hugo.toml
+        sed -i "s|baseURL = '.*'|baseURL = 'https://${MODULE_SUBDOMAIN}.infotecha.ru/'|" hugo.toml
+        sed -i "s|title = '.*'|title = '${MODULE_TITLE}'|" hugo.toml
+        
+        echo "🎯 Configuration updated:"
+        echo "  Base URL: https://${MODULE_SUBDOMAIN}.infotecha.ru/"
+        echo "  Title: ${MODULE_TITLE}"
+        
+        # Инициализируем submodules если нужно
+        git submodule update --init --recursive || echo "No submodules or already initialized"
+        
+        # Собираем сайт
+        hugo --minify --gc
+        
+        echo "✅ Site built successfully"
+        ls -la public/
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          set -e
+          
+          MODULE_NAME="${{ env.MODULE_NAME }}"
+          MODULE_SUBDOMAIN=$(echo "$MODULE_NAME" | tr '_' '-')
+          
+          echo "🚀 Deploying module: $MODULE_NAME to subdomain: $MODULE_SUBDOMAIN"
+          
+          # Создаем директорию модуля если не существует
+          sudo mkdir -p "/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+          
+          # Устанавливаем права
+          sudo chown -R www-data:www-data "/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+          
+          echo "✅ Module deployment directory prepared"
+          
+    - name: Upload built site
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        source: "build-workspace/public/*"
+        target: "/tmp/infotecha-deploy-${{ env.MODULE_NAME }}/"
+        strip_components: 2
+        
+    - name: Complete deployment
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          set -e
+          
+          MODULE_NAME="${{ env.MODULE_NAME }}"
+          MODULE_SUBDOMAIN=$(echo "$MODULE_NAME" | tr '_' '-')
+          DEPLOY_DIR="/tmp/infotecha-deploy-${MODULE_NAME}"
+          TARGET_DIR="/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+          
+          echo "📦 Deploying files to: $TARGET_DIR"
+          
+          # Копируем файлы
+          sudo cp -r "$DEPLOY_DIR"/* "$TARGET_DIR/"
+          
+          # Устанавливаем права
+          sudo chown -R www-data:www-data "$TARGET_DIR"
+          sudo chmod -R 755 "$TARGET_DIR"
+          
+          # Очищаем временные файлы
+          rm -rf "$DEPLOY_DIR"
+          
+          # Обновляем конфигурацию Apache (mod_rewrite правила)
+          sudo bash -c "cat > /etc/apache2/sites-available/infotecha-modules.conf << 'EOF'
+<VirtualHost *:80>
+    ServerName infotecha.ru
+    ServerAlias *.infotecha.ru
+    DocumentRoot /var/www/infotecha.ru
+    
+    # Главная страница
+    <Directory /var/www/infotecha.ru>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+        DirectoryIndex index.html
+    </Directory>
+    
+    # Перенаправление поддоменов в соответствующие папки
+    RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^([^.]+)\.infotecha\.ru$
+    RewriteCond %{DOCUMENT_ROOT}/%1 -d
+    RewriteRule ^/(.*) /%1/$1 [L]
+    
+    # Логи
+    ErrorLog \${APACHE_LOG_DIR}/infotecha_error.log
+    CustomLog \${APACHE_LOG_DIR}/infotecha_access.log combined
+</VirtualHost>
+EOF"
+          
+          # Включаем сайт и модуль rewrite
+          sudo a2enmod rewrite
+          sudo a2ensite infotecha-modules.conf
+          
+          # Перезагружаем Apache
+          sudo systemctl reload apache2
+          
+          echo "✅ Module $MODULE_NAME deployed successfully"
+          echo "🌐 Available at: https://${MODULE_SUBDOMAIN}.infotecha.ru"

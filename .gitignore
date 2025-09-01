@@ -1,0 +1,25 @@
+# Common files to ignore
+.DS_Store
+.vscode/
+*.log
+*.tmp
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+dist/
+build/
+*.egg-info/
+
+# Local test files
+/test-site/
+/temp-test/
+/test-results/
