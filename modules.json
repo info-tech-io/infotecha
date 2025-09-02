@@ -6,7 +6,7 @@
     "domain": "infotecha.ru",
     "github_org": "info-tech-io"
   },
-  "last_updated": "2025-09-01T17:00:00Z",
+  "last_updated": "2025-09-02T18:45:25Z",
   "modules": {
     "linux_base": {
       "name": "Основы Linux",
@@ -14,13 +14,13 @@
       "content_repo": "mod_linux_base",
       "template_repo": "hugo-base",
       "subdomain": "linux-base",
-      "last_updated": "2025-09-01T17:00:00Z",
+      "last_updated": "",
       "status": "active"
     },
     "linux_advanced": {
       "name": "Продвинутый Linux",
       "description": "Администрирование и продвинутые возможности Linux",
-      "content_repo": "mod_linux_advanced", 
+      "content_repo": "mod_linux_advanced",
       "template_repo": "hugo-base",
       "subdomain": "linux-advanced",
       "last_updated": "2025-09-01T17:00:00Z",
@@ -30,7 +30,7 @@
       "name": "Linux для профессионалов",
       "description": "Профессиональное администрирование Linux систем",
       "content_repo": "mod_linux_professional",
-      "template_repo": "hugo-base", 
+      "template_repo": "hugo-base",
       "subdomain": "linux-professional",
       "last_updated": "2025-09-01T17:00:00Z",
       "status": "active"
