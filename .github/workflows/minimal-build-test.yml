@@ -1,0 +1,255 @@
+name: Minimal Build Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      module_name:
+        description: 'Module name to build'
+        required: true
+        type: string
+        default: 'linux_base'
+      content_repo:
+        description: 'Content repository name'
+        required: true
+        type: string
+        default: 'mod_linux_base'
+
+env:
+  MODULE_NAME: ${{ github.event.inputs.module_name }}
+  CONTENT_REPO: ${{ github.event.inputs.content_repo }}
+
+jobs:
+  minimal-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout infotecha repository
+      uses: actions/checkout@v4
+      
+    - name: Debug input parameters
+      run: |
+        echo "🔍 Input parameters:"
+        echo "MODULE_NAME: $MODULE_NAME"
+        echo "CONTENT_REPO: $CONTENT_REPO"
+        echo "Repository: ${{ github.repository }}"
+        
+    - name: Checkout hugo-base template
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/hugo-base
+        path: hugo-base
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Checkout module content
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/${{ env.CONTENT_REPO }}
+        path: module-content
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Verify checkouts success
+      run: |
+        echo "🔍 Checking hugo-base..."
+        if [ -d "hugo-base" ]; then
+          echo "✅ hugo-base directory exists"
+          ls -la hugo-base/ | head -5
+          
+          if [ -f "hugo-base/hugo.toml" ]; then
+            echo "✅ hugo.toml found in hugo-base"
+            echo "Hugo config preview:"
+            head -10 hugo-base/hugo.toml
+          else
+            echo "❌ hugo.toml not found in hugo-base"
+            echo "Available config files:"
+            find hugo-base/ -name "*.toml" -o -name "*.yaml" -o -name "*.yml" | head -5
+          fi
+        else
+          echo "❌ hugo-base directory missing"
+          exit 1
+        fi
+        
+        echo ""
+        echo "🔍 Checking module content..."
+        if [ -d "module-content" ]; then
+          echo "✅ module-content directory exists"
+          ls -la module-content/ | head -5
+          
+          if [ -d "module-content/content" ]; then
+            echo "✅ content directory found in module"
+            ls -la module-content/content/ | head -3
+          else
+            echo "❌ content directory not found in module"
+            echo "Module structure:"
+            find module-content/ -type d | head -5
+          fi
+        else
+          echo "❌ module-content directory missing"
+          exit 1
+        fi
+        
+    - name: Setup Hugo
+      uses: peaceiris/actions-hugo@v2
+      with:
+        hugo-version: '0.148.2'
+        extended: true
+        
+    - name: Verify Hugo installation
+      run: |
+        echo "🔍 Verifying Hugo..."
+        hugo version
+        echo "✅ Hugo installed successfully"
+        
+    - name: Prepare build workspace
+      run: |
+        echo "🏗️ Preparing build workspace..."
+        
+        # Create build directory
+        mkdir -p build-workspace
+        cd build-workspace
+        
+        echo "Copying hugo-base..."
+        cp -r ../hugo-base/* . 2>/dev/null || echo "No files to copy from hugo-base"
+        cp -r ../hugo-base/.* . 2>/dev/null || echo "No hidden files in hugo-base"
+        
+        echo "Build workspace contents:"
+        ls -la | head -10
+        
+        # Check if we have Hugo config
+        if [ -f "hugo.toml" ]; then
+          echo "✅ hugo.toml copied successfully"
+        elif [ -f "config.toml" ]; then
+          echo "✅ config.toml found instead"
+        elif [ -f "hugo.yaml" ]; then
+          echo "✅ hugo.yaml found instead"
+        else
+          echo "❌ No Hugo configuration found"
+          echo "Looking for any config files:"
+          find . -name "*.toml" -o -name "*.yaml" -o -name "*.yml" | head -5
+          exit 1
+        fi
+        
+    - name: Replace content
+      run: |
+        cd build-workspace
+        
+        echo "🔄 Replacing content..."
+        if [ -d "../module-content/content" ]; then
+          echo "Removing default content..."
+          rm -rf content/ 2>/dev/null || echo "No default content to remove"
+          
+          echo "Copying module content..."
+          cp -r ../module-content/content/ ./
+          
+          echo "✅ Content replaced successfully"
+          echo "New content structure:"
+          ls -la content/ | head -5
+        else
+          echo "⚠️ Using default content (no module content found)"
+        fi
+        
+    - name: Update Hugo configuration
+      run: |
+        cd build-workspace
+        
+        echo "🎯 Updating Hugo configuration..."
+        
+        # Get module info from modules.json
+        MODULE_SUBDOMAIN=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].subdomain' ../modules.json)
+        MODULE_TITLE=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].name' ../modules.json)
+        
+        if [ "$MODULE_SUBDOMAIN" = "null" ] || [ -z "$MODULE_SUBDOMAIN" ]; then
+          echo "❌ Module $MODULE_NAME not found in modules.json"
+          echo "Available modules:"
+          jq -r '.modules | keys[]' ../modules.json
+          exit 1
+        fi
+        
+        echo "Module info:"
+        echo "  Name: $MODULE_TITLE"
+        echo "  Subdomain: $MODULE_SUBDOMAIN"
+        echo "  Base URL: https://${MODULE_SUBDOMAIN}.infotecha.ru/"
+        
+        # Update configuration
+        if [ -f "hugo.toml" ]; then
+          echo "Updating hugo.toml..."
+          sed -i "s|baseURL = '.*'|baseURL = 'https://${MODULE_SUBDOMAIN}.infotecha.ru/'|" hugo.toml
+          sed -i "s|title = '.*'|title = '${MODULE_TITLE}'|" hugo.toml
+          echo "✅ hugo.toml updated"
+          echo "Updated config preview:"
+          head -10 hugo.toml
+        else
+          echo "❌ hugo.toml not found for update"
+          exit 1
+        fi
+        
+    - name: Initialize submodules
+      run: |
+        cd build-workspace
+        
+        echo "🔗 Initializing submodules..."
+        if [ -f ".gitmodules" ]; then
+          echo "Found .gitmodules, initializing..."
+          git submodule update --init --recursive || echo "Submodule initialization completed with warnings"
+          echo "✅ Submodules initialized"
+        else
+          echo "ℹ️ No submodules found"
+        fi
+        
+    - name: Build Hugo site
+      run: |
+        cd build-workspace
+        
+        echo "🔨 Building Hugo site..."
+        echo "Current directory: $(pwd)"
+        echo "Hugo config check:"
+        
+        if [ -f "hugo.toml" ]; then
+          echo "Using hugo.toml"
+        elif [ -f "config.toml" ]; then
+          echo "Using config.toml"  
+        else
+          echo "❌ No Hugo config found"
+          exit 1
+        fi
+        
+        # Try to build
+        if hugo --minify --gc --verbose; then
+          echo "✅ Hugo build successful!"
+          
+          echo "Build output:"
+          ls -la public/ | head -10
+          
+          echo "Sample files:"
+          find public/ -name "*.html" | head -3 | while read file; do
+            echo "File: $file"
+          done
+          
+        else
+          echo "❌ Hugo build failed"
+          exit 1
+        fi
+        
+    - name: Test deployment preparation
+      run: |
+        cd build-workspace
+        
+        echo "📦 Testing deployment preparation..."
+        
+        if [ -d "public" ] && [ "$(ls -A public)" ]; then
+          echo "✅ Public directory exists and has content"
+          
+          # Test that we have an index.html
+          if [ -f "public/index.html" ]; then
+            echo "✅ index.html found"
+            echo "Size: $(wc -c < public/index.html) bytes"
+          else
+            echo "❌ index.html not found"
+            echo "Available files:"
+            find public/ -name "*.html" | head -5
+          fi
+          
+          echo "Build artifacts ready for deployment"
+        else
+          echo "❌ Public directory empty or missing"
+          exit 1
+        fi
