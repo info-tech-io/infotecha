@@ -1,0 +1,100 @@
+name: Simple Debug
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout infotecha
+      uses: actions/checkout@v4
+      
+    - name: Check basic info
+      run: |
+        echo "=== Basic Environment ==="
+        pwd
+        ls -la
+        echo ""
+        echo "=== modules.json ==="
+        cat modules.json
+        echo ""
+        
+    - name: Test PAT_TOKEN
+      run: |
+        echo "=== Testing PAT_TOKEN ==="
+        if [ -n "${{ secrets.PAT_TOKEN }}" ]; then
+          echo "✅ PAT_TOKEN exists"
+          # Test GitHub API
+          response=$(curl -s -H "Authorization: token ${{ secrets.PAT_TOKEN }}" https://api.github.com/user)
+          if echo "$response" | jq -e '.login' > /dev/null; then
+            echo "✅ PAT_TOKEN works - User: $(echo "$response" | jq -r '.login')"
+          else
+            echo "❌ PAT_TOKEN invalid"
+          fi
+        else
+          echo "❌ PAT_TOKEN not set"
+        fi
+        
+    - name: Test repository access
+      run: |
+        echo "=== Testing Repository Access ==="
+        
+        # Test hugo-base
+        echo "Testing hugo-base..."
+        response=$(curl -s -H "Authorization: token ${{ secrets.PAT_TOKEN }}" https://api.github.com/repos/info-tech-io/hugo-base)
+        if echo "$response" | jq -e '.name' > /dev/null; then
+          echo "✅ hugo-base accessible"
+        else
+          echo "❌ hugo-base not accessible"
+          echo "Response: $response"
+        fi
+        
+        # Test mod_linux_base  
+        echo "Testing mod_linux_base..."
+        response=$(curl -s -H "Authorization: token ${{ secrets.PAT_TOKEN }}" https://api.github.com/repos/info-tech-io/mod_linux_base)
+        if echo "$response" | jq -e '.name' > /dev/null; then
+          echo "✅ mod_linux_base accessible"
+        else
+          echo "❌ mod_linux_base not accessible"  
+          echo "Response: $response"
+        fi
+        
+    - name: Try checkout hugo-base
+      run: |
+        echo "=== Testing hugo-base checkout ==="
+        if git clone https://github.com/info-tech-io/hugo-base.git test-hugo-base 2>&1; then
+          echo "✅ Public clone worked"
+          ls -la test-hugo-base/ | head -5
+          if [ -f "test-hugo-base/hugo.toml" ]; then
+            echo "✅ hugo.toml found"
+          else
+            echo "❌ hugo.toml not found"
+            ls -la test-hugo-base/ | grep -i hugo || echo "No Hugo config found"
+          fi
+        else
+          echo "❌ Public clone failed, trying with token..."
+          if git clone https://${{ secrets.PAT_TOKEN }}@github.com/info-tech-io/hugo-base.git test-hugo-base-token 2>&1; then
+            echo "✅ Token clone worked"  
+            ls -la test-hugo-base-token/ | head -5
+          else
+            echo "❌ Token clone also failed"
+          fi
+        fi
+        
+    - name: Try checkout mod_linux_base
+      run: |
+        echo "=== Testing mod_linux_base checkout ==="
+        if git clone https://github.com/info-tech-io/mod_linux_base.git test-mod 2>&1; then
+          echo "✅ Module clone worked"
+          ls -la test-mod/ | head -5
+          if [ -d "test-mod/content" ]; then
+            echo "✅ content directory found"
+            ls -la test-mod/content/ | head -3
+          else
+            echo "❌ content directory not found"
+          fi
+        else
+          echo "❌ Module clone failed"
+        fi
