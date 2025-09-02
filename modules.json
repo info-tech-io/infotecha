@@ -15,7 +15,7 @@
       "template_repo": "hugo-base",
       "subdomain": "linux-base",
       "last_updated": "2025-09-01T17:00:00Z",
-      "status": "planned"
+      "status": "active"
     },
     "linux_advanced": {
       "name": "Продвинутый Linux",
@@ -24,7 +24,7 @@
       "template_repo": "hugo-base",
       "subdomain": "linux-advanced",
       "last_updated": "2025-09-01T17:00:00Z",
-      "status": "planned"
+      "status": "active"
     },
     "linux_professional": {
       "name": "Linux для профессионалов",
@@ -33,7 +33,7 @@
       "template_repo": "hugo-base", 
       "subdomain": "linux-professional",
       "last_updated": "2025-09-01T17:00:00Z",
-      "status": "planned"
+      "status": "active"
     }
   }
 }
