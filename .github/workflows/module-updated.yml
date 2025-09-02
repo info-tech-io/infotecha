@@ -12,7 +12,7 @@ jobs:
     - name: Checkout infotecha repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PAT_TOKEN }}
         
     - name: Parse module update payload
       id: parse
@@ -36,7 +36,7 @@ jobs:
         
         # Обновляем дату последнего обновления модуля
         jq --arg module "$MODULE_NAME" --arg date "$UPDATED_AT" \
-           '.modules[$module].last_updated = $date | .last_updated = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
+           '(.modules[$module].last_updated = $date) | (.last_updated = (now | strftime("%Y-%m-%dT%H:%M:%SZ")))' \
            modules.json > modules.json.tmp
         
         mv modules.json.tmp modules.json
