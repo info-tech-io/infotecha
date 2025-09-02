@@ -1,0 +1,168 @@
+name: Test Build Module
+
+on:
+  workflow_dispatch:
+    inputs:
+      module_name:
+        description: 'Module name to build'
+        required: true
+        type: string
+        default: 'linux_base'
+      content_repo:
+        description: 'Content repository name'
+        required: true
+        type: string
+        default: 'mod_linux_base'
+
+env:
+  MODULE_NAME: ${{ github.event.inputs.module_name }}
+  CONTENT_REPO: ${{ github.event.inputs.content_repo }}
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout infotecha repository
+      uses: actions/checkout@v4
+      
+    - name: Debug environment
+      run: |
+        echo "🔍 Debug information:"
+        echo "MODULE_NAME: $MODULE_NAME"
+        echo "CONTENT_REPO: $CONTENT_REPO"
+        echo "Current directory: $(pwd)"
+        ls -la
+        
+    - name: Check modules.json
+      run: |
+        echo "📋 Checking modules.json..."
+        if [ -f "modules.json" ]; then
+          echo "✅ modules.json exists"
+          jq . modules.json
+          MODULE_SUBDOMAIN=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].subdomain' modules.json)
+          MODULE_TITLE=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].name' modules.json)
+          echo "Subdomain: $MODULE_SUBDOMAIN"
+          echo "Title: $MODULE_TITLE"
+        else
+          echo "❌ modules.json not found"
+          exit 1
+        fi
+        
+    - name: Test repository access
+      run: |
+        echo "🔍 Testing repository access..."
+        
+        # Test hugo-base access
+        echo "Testing hugo-base repository..."
+        response=$(curl -s -H "Authorization: token $PAT_TOKEN" https://api.github.com/repos/info-tech-io/hugo-base)
+        if echo "$response" | jq -e '.full_name' > /dev/null; then
+          echo "✅ hugo-base access works"
+        else
+          echo "❌ hugo-base access failed"
+          echo "$response"
+        fi
+        
+        # Test module repository access
+        echo "Testing $CONTENT_REPO repository..."
+        response=$(curl -s -H "Authorization: token $PAT_TOKEN" https://api.github.com/repos/info-tech-io/$CONTENT_REPO)
+        if echo "$response" | jq -e '.full_name' > /dev/null; then
+          echo "✅ $CONTENT_REPO access works"
+        else
+          echo "❌ $CONTENT_REPO access failed"
+          echo "$response"
+        fi
+      env:
+        PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Checkout hugo-base template
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/hugo-base
+        path: hugo-base
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Checkout module content
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/${{ env.CONTENT_REPO }}
+        path: module-content
+        token: ${{ secrets.PAT_TOKEN }}
+        
+    - name: Verify checkouts
+      run: |
+        echo "🔍 Verifying checkouts..."
+        echo "Hugo-base contents:"
+        ls -la hugo-base/ | head -10
+        echo ""
+        echo "Module content:"
+        ls -la module-content/ | head -10
+        echo ""
+        if [ -d "module-content/content" ]; then
+          echo "✅ Module has content directory"
+          ls -la module-content/content/ | head -5
+        else
+          echo "❌ Module missing content directory"
+        fi
+        
+    - name: Setup Hugo
+      uses: peaceiris/actions-hugo@v2
+      with:
+        hugo-version: '0.148.2'
+        extended: true
+        
+    - name: Test build process
+      run: |
+        echo "🏗️ Testing build process for module: $MODULE_NAME"
+        
+        # Create build workspace
+        mkdir -p build-workspace
+        cd build-workspace
+        
+        # Copy hugo-base template
+        cp -r ../hugo-base/* .
+        cp -r ../hugo-base/.* . 2>/dev/null || true
+        
+        echo "📁 Build workspace contents:"
+        ls -la | head -10
+        
+        # Replace content if exists
+        if [ -d "../module-content/content" ]; then
+          echo "📂 Using content from module repository"
+          rm -rf content/
+          cp -r ../module-content/content/ ./
+          echo "✅ Content replaced"
+        else
+          echo "⚠️ No content/ folder in module repository, using default"
+        fi
+        
+        # Update Hugo configuration
+        MODULE_SUBDOMAIN=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].subdomain' ../modules.json)
+        MODULE_TITLE=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].name' ../modules.json)
+        
+        echo "🎯 Configuration:"
+        echo "  Base URL: https://${MODULE_SUBDOMAIN}.infotecha.ru/"
+        echo "  Title: ${MODULE_TITLE}"
+        
+        # Check if hugo.toml exists
+        if [ -f "hugo.toml" ]; then
+          echo "📝 Updating hugo.toml..."
+          sed -i "s|baseURL = '.*'|baseURL = 'https://${MODULE_SUBDOMAIN}.infotecha.ru/'|" hugo.toml
+          sed -i "s|title = '.*'|title = '${MODULE_TITLE}'|" hugo.toml
+          echo "Updated hugo.toml:"
+          head -10 hugo.toml
+        else
+          echo "❌ hugo.toml not found"
+          ls -la | grep -i hugo || echo "No Hugo config files found"
+        fi
+        
+        # Try to build
+        echo "🔨 Attempting to build site..."
+        if hugo --minify --gc; then
+          echo "✅ Site built successfully"
+          echo "📁 Build output:"
+          ls -la public/ | head -10
+        else
+          echo "❌ Build failed"
+          exit 1
+        fi
