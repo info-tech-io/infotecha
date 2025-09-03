@@ -17,14 +17,54 @@ on:
         default: 'mod_linux_base'
 
 env:
-  MODULE_NAME: ${{ github.event.client_payload.module_name || github.event.inputs.module_name }}
-  CONTENT_REPO: ${{ github.event.client_payload.content_repo || github.event.inputs.content_repo }}
+  MODULE_NAME: ${{ github.event.client_payload.module_name || github.event.inputs.module_name || 'linux_base' }}
+  CONTENT_REPO: ${{ github.event.client_payload.content_repo || github.event.inputs.content_repo || 'mod_linux_base' }}
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Debug workflow trigger and environment
+      run: |
+        echo "🔍 Build Module Workflow Debug Information"
+        echo "Trigger event: ${{ github.event_name }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Ref: ${{ github.ref }}"
+        echo ""
+        echo "Environment variables:"
+        echo "MODULE_NAME: ${{ env.MODULE_NAME }}"
+        echo "CONTENT_REPO: ${{ env.CONTENT_REPO }}"
+        echo ""
+        if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          echo "Repository dispatch payload:"
+          echo "module_name: ${{ github.event.client_payload.module_name }}"
+          echo "content_repo: ${{ github.event.client_payload.content_repo }}"
+          echo "trigger: ${{ github.event.client_payload.trigger }}"
+        elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "Manual workflow dispatch inputs:"
+          echo "module_name: ${{ github.event.inputs.module_name }}"
+          echo "content_repo: ${{ github.event.inputs.content_repo }}"
+        fi
+        echo ""
+        echo "✅ Environment validation complete"
+        
+    - name: Validate environment variables
+      run: |
+        if [ -z "${{ env.MODULE_NAME }}" ] || [ "${{ env.MODULE_NAME }}" = "null" ]; then
+          echo "❌ MODULE_NAME is empty or null"
+          exit 1
+        fi
+        
+        if [ -z "${{ env.CONTENT_REPO }}" ] || [ "${{ env.CONTENT_REPO }}" = "null" ]; then
+          echo "❌ CONTENT_REPO is empty or null"
+          exit 1
+        fi
+        
+        echo "✅ Environment variables validated successfully"
+        echo "Will build module: ${{ env.MODULE_NAME }}"
+        echo "Using content from: ${{ env.CONTENT_REPO }}"
+        
     - name: Checkout infotecha repository
       uses: actions/checkout@v4
       
