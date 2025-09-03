@@ -9,10 +9,12 @@ on:
         description: 'Module name to build'
         required: true
         type: string
+        default: 'linux_base'
       content_repo:
         description: 'Content repository name'
         required: true
         type: string
+        default: 'mod_linux_base'
 
 env:
   MODULE_NAME: ${{ github.event.client_payload.module_name || github.event.inputs.module_name }}
