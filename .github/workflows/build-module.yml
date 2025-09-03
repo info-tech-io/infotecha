@@ -287,29 +287,29 @@ jobs:
           # Обновляем/создаем Apache конфигурацию для поддоменов если нужно
           if ! sudo test -f /etc/apache2/sites-available/infotecha.conf; then
             echo "⚙️ Creating Apache configuration..."
-            sudo tee /etc/apache2/sites-available/infotecha.conf > /dev/null << 'EOF'
-<VirtualHost *:80>
-    ServerName infotecha.ru
-    ServerAlias *.infotecha.ru
-    DocumentRoot /var/www/infotecha.ru
-    
-    <Directory /var/www/infotecha.ru>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-        DirectoryIndex index.html
-    </Directory>
-    
-    RewriteEngine On
-    RewriteCond %{HTTP_HOST} ^([a-z0-9\-]+)\.infotecha\.ru$ [NC]
-    RewriteCond %{HTTP_HOST} !^(www|mail|ftp|admin)\.infotecha\.ru$ [NC]
-    RewriteCond %{DOCUMENT_ROOT}/%1 -d
-    RewriteRule ^(.*)$ /%1/$1 [L]
-    
-    ErrorLog /var/www/infotecha.ru/logs/error.log
-    CustomLog /var/www/infotecha.ru/logs/access.log combined
-</VirtualHost>
-EOF
+            sudo bash -c 'cat > /etc/apache2/sites-available/infotecha.conf << '"'"'EOF'"'"'
+          <VirtualHost *:80>
+              ServerName infotecha.ru
+              ServerAlias *.infotecha.ru
+              DocumentRoot /var/www/infotecha.ru
+              
+              <Directory /var/www/infotecha.ru>
+                  Options -Indexes +FollowSymLinks
+                  AllowOverride All
+                  Require all granted
+                  DirectoryIndex index.html
+              </Directory>
+              
+              RewriteEngine On
+              RewriteCond %{HTTP_HOST} ^([a-z0-9\-]+)\.infotecha\.ru$ [NC]
+              RewriteCond %{HTTP_HOST} !^(www|mail|ftp|admin)\.infotecha\.ru$ [NC]
+              RewriteCond %{DOCUMENT_ROOT}/%1 -d
+              RewriteRule ^(.*)$ /%1/$1 [L]
+              
+              ErrorLog /var/www/infotecha.ru/logs/error.log
+              CustomLog /var/www/infotecha.ru/logs/access.log combined
+          </VirtualHost>
+          EOF'
             sudo a2enmod rewrite headers
             sudo a2ensite infotecha.conf
             sudo a2dissite 000-default || true
