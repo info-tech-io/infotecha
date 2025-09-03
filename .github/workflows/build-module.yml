@@ -74,6 +74,7 @@ jobs:
         repository: info-tech-io/hugo-base
         path: hugo-base
         token: ${{ secrets.PAT_TOKEN }}
+        submodules: recursive
         
     - name: Checkout module content
       uses: actions/checkout@v4
@@ -175,35 +176,36 @@ jobs:
         echo "  Base URL: https://${MODULE_SUBDOMAIN}.infotecha.ru/"
         echo "  Title: ${MODULE_TITLE}"
         
-        # Правильно инициализируем git и submodules
-        echo "🔧 Setting up git repository and submodules..."
-        git init
-        git config user.name "InfoTech.io Bot"
-        git config user.email "bot@infotecha.ru"
-        
-        # Добавляем remote для доступа к submodules
-        git remote add origin https://github.com/info-tech-io/hugo-base.git
-        
-        # Инициализируем submodules только если .gitmodules существует
+        # Проверяем, что submodules были клонированы корректно
+        echo "🔧 Checking submodules and themes..."
         if [ -f .gitmodules ]; then
-          echo "📦 Initializing git submodules..."
-          git submodule update --init --recursive || {
-            echo "⚠️ Submodule initialization failed, checking themes manually..."
-            if [ ! -d themes/compose ] || [ -z "$(ls -A themes/compose 2>/dev/null)" ]; then
-              echo "❌ Theme not available, cannot build site"
-              exit 1
-            fi
-            echo "✅ Theme directory exists, continuing..."
-          }
+          echo "📋 .gitmodules found, checking submodule directories..."
+          
+          # Проверяем тему
+          if [ ! -d themes/compose ]; then
+            echo "❌ Theme 'compose' not found in themes/ directory"
+            echo "Available themes:"
+            ls -la themes/ 2>/dev/null || echo "No themes directory found"
+            exit 1
+          fi
+          
+          # Проверяем, что тема не пустая  
+          if [ -z "$(ls -A themes/compose 2>/dev/null)" ]; then
+            echo "❌ Theme 'compose' directory is empty"
+            exit 1
+          fi
+          
+          # Проверяем quiz engine
+          if [ ! -d static/quiz ]; then
+            echo "❌ Quiz engine not found in static/quiz directory"
+            echo "Available static content:"
+            ls -la static/ 2>/dev/null || echo "No static directory found"
+            exit 1
+          fi
+          
+          echo "✅ All submodules validated successfully"
         else
-          echo "ℹ️ No .gitmodules found, skipping submodule initialization"
-        fi
-        
-        # Проверяем, что тема доступна
-        if [ ! -d themes/compose ]; then
-          echo "❌ Theme 'compose' not found in themes/ directory"
-          ls -la themes/
-          exit 1
+          echo "ℹ️ No .gitmodules found, skipping submodule validation"
         fi
         
         echo "🏗️ Building Hugo site..."
