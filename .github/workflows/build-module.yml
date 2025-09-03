@@ -220,8 +220,24 @@ jobs:
         
         echo "🏗️ Building Hugo site..."
         
+        # Детальная диагностика перед сборкой Hugo
+        echo "📋 Pre-build diagnostics:"
+        echo "Current directory: $(pwd)"
+        echo "Hugo version: $(hugo version || echo 'Hugo not found')"
+        echo "Config file check:"
+        ls -la *.toml *.yaml *.json 2>/dev/null || echo "No config files found"
+        echo "Themes directory:"
+        ls -la themes/ 2>/dev/null || echo "No themes directory"
+        echo "Content directory:"
+        ls -la content/ 2>/dev/null || echo "No content directory"
+        
+        # Проверяем Hugo конфигурацию
+        echo "📊 Hugo config validation:"
+        hugo config || echo "Hugo config command failed"
+        
         # Собираем сайт с детальным выводом ошибок
-        if ! hugo --minify --gc --verbose; then
+        echo "🚀 Starting Hugo build with detailed logging..."
+        if ! hugo --minify --gc --logLevel debug; then
           echo "❌ Hugo build failed!"
           echo "📋 Hugo configuration:"
           cat hugo.toml
