@@ -6,7 +6,7 @@
     "domain": "infotecha.ru",
     "github_org": "info-tech-io"
   },
-  "last_updated": "2025-09-03T14:49:26Z",
+  "last_updated": "2025-09-03T17:57:30Z",
   "modules": {
     "linux_base": {
       "name": "Основы Linux",
@@ -14,7 +14,7 @@
       "content_repo": "mod_linux_base",
       "template_repo": "hugo-base",
       "subdomain": "linux-base",
-      "last_updated": "2025-09-03T15:00:00Z",
+      "last_updated": "",
       "status": "active"
     },
     "linux_advanced": {
