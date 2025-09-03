@@ -118,9 +118,19 @@ jobs:
         mkdir -p build-workspace
         cd build-workspace
         
-        # Копируем шаблон hugo-base (только нужные файлы)
+        # Копируем шаблон hugo-base (все файлы включая скрытые)
         echo "📋 Copying hugo-base template..."
         cp -r ../hugo-base/* . 2>/dev/null || true
+        cp ../hugo-base/.* . 2>/dev/null || true
+        
+        # Убеждаемся, что критичные файлы скопированы
+        if [ ! -f hugo.toml ]; then
+          echo "⚠️ hugo.toml not found, copying explicitly..."
+          cp ../hugo-base/hugo.toml . || {
+            echo "❌ Failed to copy hugo.toml"
+            exit 1
+          }
+        fi
         
         # Копируем .gitmodules для submodules
         if [ -f ../hugo-base/.gitmodules ]; then
