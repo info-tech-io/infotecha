@@ -187,6 +187,20 @@ jobs:
         hugo-version: '0.148.2'
         extended: true
 
+    - name: Setup Node.js for hugo-templates
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: hugo-templates/package-lock.json
+
+    - name: Install hugo-templates dependencies
+      run: |
+        cd hugo-templates
+        echo "📦 Installing Hugo Template Factory dependencies..."
+        npm install
+        echo "✅ Dependencies installed successfully"
+
     - name: Validate repositories checkout
       run: |
         echo "🔍 Validating repository checkouts..."
