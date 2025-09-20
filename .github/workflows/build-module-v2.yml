@@ -170,6 +170,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: info-tech-io/hugo-templates
+        ref: 5f85b57
         path: hugo-templates
         token: ${{ secrets.PAT_TOKEN }}
         submodules: recursive
