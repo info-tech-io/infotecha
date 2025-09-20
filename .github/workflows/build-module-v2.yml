@@ -80,8 +80,10 @@ jobs:
 
           # Используем готовые утилиты Task 007
           set +e  # Не прерываем выполнение при ошибке
-          MODULE_CONFIG=$(node scripts/scan-modules.js --module "mod_$MODULE_NAME" --output json 2>/dev/null)
+          SCAN_OUTPUT=$(node scripts/scan-modules.js --module "mod_$MODULE_NAME" --output json 2>/dev/null)
           SCAN_EXIT_CODE=$?
+          # Извлекаем только JSON часть (все что после первой {)
+          MODULE_CONFIG=$(echo "$SCAN_OUTPUT" | sed -n '/{/,$p')
           set -e
 
           if [ $SCAN_EXIT_CODE -eq 0 ] && [ "$MODULE_CONFIG" != "{}" ] && [ -n "$MODULE_CONFIG" ]; then
