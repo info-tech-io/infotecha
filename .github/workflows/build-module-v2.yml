@@ -231,13 +231,13 @@ jobs:
 
         # Запускаем Hugo Template Factory build
         ./scripts/build.sh \
-          --template="${{ needs.determine-build-system.outputs.hugo_template }}" \
-          --theme="${{ needs.determine-build-system.outputs.hugo_theme }}" \
-          --components="${{ needs.determine-build-system.outputs.hugo_components }}" \
-          --content="../module-content" \
-          --output="public" \
-          --environment="production" \
-          --base-url="https://${{ needs.determine-build-system.outputs.module_subdomain }}.infotecha.ru/" \
+          --template "${{ needs.determine-build-system.outputs.hugo_template }}" \
+          --theme "${{ needs.determine-build-system.outputs.hugo_theme }}" \
+          --components "${{ needs.determine-build-system.outputs.hugo_components }}" \
+          --content "../module-content" \
+          --output "public" \
+          --environment "production" \
+          --base-url "https://${{ needs.determine-build-system.outputs.module_subdomain }}.infotecha.ru/" \
           --minify \
           --verbose
 
