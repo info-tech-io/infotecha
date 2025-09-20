@@ -1,0 +1,42 @@
+{
+  "name": "@info-tech-io/infotecha-tools",
+  "version": "1.0.0",
+  "description": "Tools and utilities for InfoTech.io educational platform",
+  "main": "scripts/scan-modules.js",
+  "scripts": {
+    "validate": "node scripts/validate-module.js",
+    "scan": "node scripts/scan-modules.js",
+    "scan:validate": "node scripts/scan-modules.js --validate",
+    "generate:unified": "node scripts/scan-modules.js --output json > unified-modules.json",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "bin": {
+    "validate-module": "./scripts/validate-module.js",
+    "scan-modules": "./scripts/scan-modules.js"
+  },
+  "keywords": [
+    "education",
+    "hugo",
+    "static-site",
+    "module-management",
+    "validation"
+  ],
+  "author": "InfoTech.io Team",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/info-tech-io/infotecha.git"
+  },
+  "bugs": {
+    "url": "https://github.com/info-tech-io/infotecha/issues"
+  },
+  "homepage": "https://infotecha.ru"
+}

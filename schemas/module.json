@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://infotecha.ru/schemas/module.json",
+  "title": "InfoTech.io Module Configuration",
+  "description": "Schema for module.json files in educational modules",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "title",
+    "description",
+    "version",
+    "type",
+    "deployment",
+    "hugo_config",
+    "metadata",
+    "urls",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of the module.json schema",
+      "enum": ["1.0"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Unique module identifier (kebab-case)",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 50
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable module title",
+      "minLength": 5,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed module description",
+      "minLength": 20,
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the module",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "type": {
+      "type": "string",
+      "description": "Type of educational module",
+      "enum": ["educational", "academic", "corporate", "documentation", "tutorial"]
+    },
+    "deployment": {
+      "type": "object",
+      "description": "Deployment configuration",
+      "required": ["subdomain", "repository", "build_system"],
+      "properties": {
+        "subdomain": {
+          "type": "string",
+          "description": "Subdomain for module deployment",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 2,
+          "maxLength": 50
+        },
+        "repository": {
+          "type": "string",
+          "description": "GitHub repository name",
+          "pattern": "^mod_[a-z0-9]+(_[a-z0-9]+)*$"
+        },
+        "build_system": {
+          "type": "string",
+          "description": "Build system used for module",
+          "enum": ["hugo-base", "hugo-templates"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "hugo_config": {
+      "type": "object",
+      "description": "Hugo-specific configuration",
+      "required": ["template", "theme", "components", "hugo_version"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "description": "Hugo template to use",
+          "enum": ["default", "minimal", "academic", "enterprise"]
+        },
+        "theme": {
+          "type": "string",
+          "description": "Hugo theme name",
+          "enum": ["compose", "academic", "corporate"]
+        },
+        "components": {
+          "type": "array",
+          "description": "List of components to include",
+          "items": {
+            "type": "string",
+            "enum": ["quiz-engine", "analytics", "auth", "citations", "terminal"]
+          },
+          "uniqueItems": true
+        },
+        "hugo_version": {
+          "type": "string",
+          "description": "Required Hugo version",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Module metadata",
+      "required": ["author", "difficulty", "estimated_time", "language", "tags"],
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Module author or organization",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "maintainer": {
+          "type": "string",
+          "description": "Current maintainer",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "license": {
+          "type": "string",
+          "description": "License type",
+          "enum": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "CC-BY-4.0", "CC-BY-SA-4.0"]
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "Difficulty level",
+          "enum": ["beginner", "intermediate", "advanced", "expert"]
+        },
+        "estimated_time": {
+          "type": "string",
+          "description": "Estimated completion time",
+          "pattern": "^\\d+\\s+(hour|hours|day|days|week|weeks)$"
+        },
+        "language": {
+          "type": "string",
+          "description": "Primary language",
+          "enum": ["ru", "en", "es", "fr", "de", "zh"]
+        },
+        "tags": {
+          "type": "array",
+          "description": "Descriptive tags",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "minLength": 2,
+            "maxLength": 30
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "urls": {
+      "type": "object",
+      "description": "Related URLs",
+      "required": ["production", "repository"],
+      "properties": {
+        "production": {
+          "type": "string",
+          "description": "Production URL",
+          "format": "uri",
+          "pattern": "^https://[a-z0-9-]+\\.infotecha\\.ru/?$"
+        },
+        "repository": {
+          "type": "string",
+          "description": "GitHub repository URL",
+          "format": "uri",
+          "pattern": "^https://github\\.com/info-tech-io/mod_[a-z0-9_]+/?$"
+        },
+        "issues": {
+          "type": "string",
+          "description": "Issues tracker URL",
+          "format": "uri"
+        },
+        "documentation": {
+          "type": "string",
+          "description": "Documentation URL",
+          "format": "uri"
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "description": "Module status information",
+      "required": ["lifecycle", "last_updated"],
+      "properties": {
+        "lifecycle": {
+          "type": "string",
+          "description": "Development lifecycle stage",
+          "enum": ["development", "beta", "stable", "maintenance", "deprecated"]
+        },
+        "last_updated": {
+          "type": "string",
+          "description": "Last update date",
+          "format": "date"
+        },
+        "content_complete": {
+          "type": "boolean",
+          "description": "Is content development complete"
+        },
+        "testing_complete": {
+          "type": "boolean",
+          "description": "Is testing complete"
+        },
+        "review_complete": {
+          "type": "boolean",
+          "description": "Is review process complete"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
