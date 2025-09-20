@@ -170,7 +170,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: info-tech-io/hugo-templates
-        ref: 5f85b57
         path: hugo-templates
         token: ${{ secrets.PAT_TOKEN }}
         submodules: recursive
@@ -215,6 +214,13 @@ jobs:
         fi
 
         echo "✅ All repositories checked out successfully"
+
+        # Show hugo-templates commit info
+        echo "📋 Hugo-templates commit info:"
+        cd hugo-templates
+        git log --oneline -1
+        cd ..
+
         echo "📂 Hugo-templates structure:"
         ls -la hugo-templates/ | head -10
         echo "📂 Module content structure:"
