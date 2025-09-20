@@ -1,0 +1,409 @@
+name: Build Module v2 (Hugo Template Factory)
+
+on:
+  repository_dispatch:
+    types: [build-module-v2]
+  workflow_dispatch:
+    inputs:
+      module_name:
+        description: 'Module name to build (e.g., linux_base)'
+        required: true
+        type: string
+        default: 'linux_base'
+      content_repo:
+        description: 'Content repository name (e.g., mod_linux_base)'
+        required: true
+        type: string
+        default: 'mod_linux_base'
+      force_hugo_base:
+        description: 'Emergency fallback to legacy hugo-base'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  MODULE_NAME: ${{ github.event.client_payload.module_name || github.event.inputs.module_name || 'linux_base' }}
+  CONTENT_REPO: ${{ github.event.client_payload.content_repo || github.event.inputs.content_repo || 'mod_linux_base' }}
+  FORCE_HUGO_BASE: ${{ github.event.client_payload.force_hugo_base || github.event.inputs.force_hugo_base || 'false' }}
+
+jobs:
+  determine-build-system:
+    runs-on: ubuntu-latest
+    outputs:
+      build_system: ${{ steps.determine.outputs.build_system }}
+      hugo_template: ${{ steps.determine.outputs.hugo_template }}
+      hugo_theme: ${{ steps.determine.outputs.hugo_theme }}
+      hugo_components: ${{ steps.determine.outputs.hugo_components }}
+      module_subdomain: ${{ steps.determine.outputs.module_subdomain }}
+      module_title: ${{ steps.determine.outputs.module_title }}
+
+    steps:
+    - name: Workflow identification
+      run: |
+        echo "🚀 Build Module v2 - Hugo Template Factory Framework"
+        echo "======================================================"
+        echo "Module: ${{ env.MODULE_NAME }}"
+        echo "Content repo: ${{ env.CONTENT_REPO }}"
+        echo "Force legacy: ${{ env.FORCE_HUGO_BASE }}"
+        echo "Trigger: ${{ github.event_name }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Ref: ${{ github.ref }}"
+        echo ""
+
+    - name: Checkout infotecha for utilities
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js for module scanning
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies for Task 007 utilities
+      run: |
+        echo "📦 Installing dependencies for module scanning..."
+        npm install
+        echo "✅ Dependencies installed"
+
+    - name: Determine build system and configuration
+      id: determine
+      run: |
+        echo "🔍 Determining build system for module: $MODULE_NAME"
+
+        if [ "$FORCE_HUGO_BASE" = "true" ]; then
+          echo "⚠️ EMERGENCY: Forced hugo-base mode activated"
+          echo "build_system=legacy" >> $GITHUB_OUTPUT
+          echo "hugo_template=legacy" >> $GITHUB_OUTPUT
+          echo "hugo_theme=compose" >> $GITHUB_OUTPUT
+          echo "hugo_components=quiz-engine" >> $GITHUB_OUTPUT
+        else
+          echo "📡 Reading configuration from module.json using Task 007 utilities..."
+
+          # Используем готовые утилиты Task 007
+          set +e  # Не прерываем выполнение при ошибке
+          MODULE_CONFIG=$(node scripts/scan-modules.js --module $MODULE_NAME --output json 2>/dev/null)
+          SCAN_EXIT_CODE=$?
+          set -e
+
+          if [ $SCAN_EXIT_CODE -eq 0 ] && [ "$MODULE_CONFIG" != "{}" ] && [ -n "$MODULE_CONFIG" ]; then
+            echo "✅ Found module.json configuration"
+
+            # Извлекаем Hugo конфигурацию
+            HUGO_TEMPLATE=$(echo "$MODULE_CONFIG" | jq -r '.hugo_config.template // "default"')
+            HUGO_THEME=$(echo "$MODULE_CONFIG" | jq -r '.hugo_config.theme // "compose"')
+            HUGO_COMPONENTS=$(echo "$MODULE_CONFIG" | jq -r '.hugo_config.components[]' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "quiz-engine")
+
+            if [ "$HUGO_TEMPLATE" != "null" ] && [ -n "$HUGO_TEMPLATE" ]; then
+              echo "🎯 Using Hugo Template Factory Framework"
+              echo "build_system=modern" >> $GITHUB_OUTPUT
+              echo "hugo_template=$HUGO_TEMPLATE" >> $GITHUB_OUTPUT
+              echo "hugo_theme=$HUGO_THEME" >> $GITHUB_OUTPUT
+              echo "hugo_components=$HUGO_COMPONENTS" >> $GITHUB_OUTPUT
+
+              echo "📋 Hugo Configuration:"
+              echo "  Template: $HUGO_TEMPLATE"
+              echo "  Theme: $HUGO_THEME"
+              echo "  Components: $HUGO_COMPONENTS"
+            else
+              echo "⚠️ Invalid hugo_config in module.json, falling back to hugo-base"
+              echo "build_system=legacy" >> $GITHUB_OUTPUT
+              echo "hugo_template=legacy" >> $GITHUB_OUTPUT
+              echo "hugo_theme=compose" >> $GITHUB_OUTPUT
+              echo "hugo_components=quiz-engine" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ No valid module.json found or scan failed, falling back to hugo-base"
+            echo "Scan exit code: $SCAN_EXIT_CODE"
+            echo "Module config: $MODULE_CONFIG"
+            echo "build_system=legacy" >> $GITHUB_OUTPUT
+            echo "hugo_template=legacy" >> $GITHUB_OUTPUT
+            echo "hugo_theme=compose" >> $GITHUB_OUTPUT
+            echo "hugo_components=quiz-engine" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: Get module metadata
+      id: metadata
+      run: |
+        echo "📋 Reading module metadata..."
+
+        # Получаем subdomain и title из modules.json (legacy) или module.json (modern)
+        MODULE_SUBDOMAIN=$(echo "$MODULE_NAME" | tr '_' '-')
+
+        # Пытаемся получить title из module.json
+        MODULE_CONFIG=$(node scripts/scan-modules.js --module $MODULE_NAME --output json 2>/dev/null || echo '{}')
+        MODULE_TITLE=$(echo "$MODULE_CONFIG" | jq -r '.title // ""')
+
+        # Fallback на legacy modules.json
+        if [ -z "$MODULE_TITLE" ] || [ "$MODULE_TITLE" = "null" ]; then
+          MODULE_TITLE=$(jq -r --arg module "$MODULE_NAME" '.modules[$module].name // "Unknown Module"' modules.json)
+        fi
+
+        echo "module_subdomain=$MODULE_SUBDOMAIN" >> $GITHUB_OUTPUT
+        echo "module_title=$MODULE_TITLE" >> $GITHUB_OUTPUT
+
+        echo "🎯 Module Metadata:"
+        echo "  Name: $MODULE_NAME"
+        echo "  Subdomain: $MODULE_SUBDOMAIN"
+        echo "  Title: $MODULE_TITLE"
+
+  build-with-hugo-templates:
+    needs: determine-build-system
+    if: needs.determine-build-system.outputs.build_system == 'modern'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Hugo Template Factory build notification
+      run: |
+        echo "🎯 Building with Hugo Template Factory Framework"
+        echo "================================================"
+        echo "Module: ${{ env.MODULE_NAME }}"
+        echo "Template: ${{ needs.determine-build-system.outputs.hugo_template }}"
+        echo "Theme: ${{ needs.determine-build-system.outputs.hugo_theme }}"
+        echo "Components: ${{ needs.determine-build-system.outputs.hugo_components }}"
+        echo "Output subdomain: ${{ needs.determine-build-system.outputs.module_subdomain }}"
+        echo "Module title: ${{ needs.determine-build-system.outputs.module_title }}"
+
+    - name: Checkout hugo-templates repository
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/hugo-templates
+        path: hugo-templates
+        token: ${{ secrets.PAT_TOKEN }}
+        submodules: recursive
+
+    - name: Checkout module content
+      uses: actions/checkout@v4
+      with:
+        repository: info-tech-io/${{ env.CONTENT_REPO }}
+        path: module-content
+        token: ${{ secrets.PAT_TOKEN }}
+
+    - name: Setup Hugo
+      uses: peaceiris/actions-hugo@v2
+      with:
+        hugo-version: '0.148.2'
+        extended: true
+
+    - name: Validate repositories checkout
+      run: |
+        echo "🔍 Validating repository checkouts..."
+
+        if [ ! -d hugo-templates ] || [ -z "$(ls -A hugo-templates)" ]; then
+          echo "❌ hugo-templates checkout failed or empty"
+          exit 1
+        fi
+
+        if [ ! -d module-content ] || [ -z "$(ls -A module-content)" ]; then
+          echo "❌ module-content checkout failed or empty"
+          exit 1
+        fi
+
+        echo "✅ All repositories checked out successfully"
+        echo "📂 Hugo-templates structure:"
+        ls -la hugo-templates/ | head -10
+        echo "📂 Module content structure:"
+        ls -la module-content/ | head -10
+
+    - name: Build with Hugo Template Factory
+      run: |
+        cd hugo-templates
+
+        echo "🏗️ Building with Hugo Template Factory Framework"
+        echo "Configuration:"
+        echo "  Template: ${{ needs.determine-build-system.outputs.hugo_template }}"
+        echo "  Theme: ${{ needs.determine-build-system.outputs.hugo_theme }}"
+        echo "  Components: ${{ needs.determine-build-system.outputs.hugo_components }}"
+        echo "  Content source: ../module-content"
+        echo "  Output: public/"
+
+        # Проверяем доступность hugo-templates CLI
+        if [ ! -f "./scripts/build.sh" ]; then
+          echo "❌ Hugo Template Factory build script not found"
+          ls -la scripts/
+          exit 1
+        fi
+
+        # Делаем скрипт исполняемым
+        chmod +x ./scripts/build.sh
+
+        # Запускаем Hugo Template Factory build
+        ./scripts/build.sh \
+          --template="${{ needs.determine-build-system.outputs.hugo_template }}" \
+          --theme="${{ needs.determine-build-system.outputs.hugo_theme }}" \
+          --components="${{ needs.determine-build-system.outputs.hugo_components }}" \
+          --content="../module-content" \
+          --output="public" \
+          --environment="production" \
+          --base-url="https://${{ needs.determine-build-system.outputs.module_subdomain }}.infotecha.ru/" \
+          --minify \
+          --verbose
+
+    - name: Validate build output
+      run: |
+        cd hugo-templates
+
+        echo "🔍 Validating Hugo Template Factory build output..."
+
+        if [ ! -d "public" ] || [ -z "$(ls -A public)" ]; then
+          echo "❌ Build failed - no output generated"
+          exit 1
+        fi
+
+        if [ ! -f "public/index.html" ]; then
+          echo "❌ Build failed - no index.html generated"
+          exit 1
+        fi
+
+        # Проверяем размер output
+        OUTPUT_SIZE=$(du -sh public/ | cut -f1)
+        FILE_COUNT=$(find public -type f | wc -l)
+
+        echo "✅ Build validation successful"
+        echo "📊 Build statistics:"
+        echo "  Output size: $OUTPUT_SIZE"
+        echo "  Files generated: $FILE_COUNT"
+        echo "📂 Generated files sample:"
+        find public -type f -name "*.html" | head -10
+
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          MODULE_SUBDOMAIN="${{ needs.determine-build-system.outputs.module_subdomain }}"
+          echo "🚀 Deploying module: ${{ env.MODULE_NAME }} to subdomain: ${MODULE_SUBDOMAIN}"
+          echo "🏗️ Built with: Hugo Template Factory Framework"
+          echo "📋 Template: ${{ needs.determine-build-system.outputs.hugo_template }}"
+
+          # Создаем директорию модуля
+          sudo mkdir -p "/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+          sudo chown -R www-data:www-data "/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+
+          echo "✅ Deployment directory prepared"
+
+    - name: Upload built site
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        source: "hugo-templates/public/*"
+        target: "/tmp/infotecha-deploy-${{ env.MODULE_NAME }}/"
+        strip_components: 2
+
+    - name: Complete deployment and mark build system
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          MODULE_SUBDOMAIN="${{ needs.determine-build-system.outputs.module_subdomain }}"
+          DEPLOY_DIR="/tmp/infotecha-deploy-${{ env.MODULE_NAME }}"
+          TARGET_DIR="/var/www/infotecha.ru/${MODULE_SUBDOMAIN}"
+
+          echo "📦 Completing deployment to: $TARGET_DIR"
+
+          # Backup current version (if exists)
+          if [ -d "$TARGET_DIR" ] && [ "$(ls -A $TARGET_DIR)" ]; then
+            sudo cp -r "$TARGET_DIR" "${TARGET_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+            echo "💾 Current version backed up"
+          fi
+
+          # Deploy new version
+          sudo cp -r "$DEPLOY_DIR"/* "$TARGET_DIR/"
+          sudo chown -R www-data:www-data "$TARGET_DIR"
+          sudo chmod -R 755 "$TARGET_DIR"
+
+          # Create build system marker
+          BUILD_INFO="hugo-templates:${{ needs.determine-build-system.outputs.hugo_template }}:$(date -Iseconds)"
+          echo "$BUILD_INFO" | sudo tee "$TARGET_DIR/.build-system" > /dev/null
+
+          # Create deployment metadata
+          cat << EOF | sudo tee "$TARGET_DIR/.deployment-info" > /dev/null
+          {
+            "build_system": "hugo-templates",
+            "template": "${{ needs.determine-build-system.outputs.hugo_template }}",
+            "theme": "${{ needs.determine-build-system.outputs.hugo_theme }}",
+            "components": "${{ needs.determine-build-system.outputs.hugo_components }}",
+            "deployed_at": "$(date -Iseconds)",
+            "module_name": "${{ env.MODULE_NAME }}",
+            "content_repo": "${{ env.CONTENT_REPO }}",
+            "workflow": "build-module-v2"
+          }
+          EOF
+
+          # Cleanup temporary files
+          rm -rf "$DEPLOY_DIR"
+
+          # Reload Apache
+          sudo systemctl reload apache2
+
+          echo "✅ Module ${{ env.MODULE_NAME }} deployed successfully with Hugo Template Factory"
+          echo "🌐 Available at: https://${MODULE_SUBDOMAIN}.infotecha.ru"
+          echo "🏗️ Template: ${{ needs.determine-build-system.outputs.hugo_template }}"
+          echo "🎨 Theme: ${{ needs.determine-build-system.outputs.hugo_theme }}"
+          echo "🧩 Components: ${{ needs.determine-build-system.outputs.hugo_components }}"
+
+  build-with-hugo-base:
+    needs: determine-build-system
+    if: needs.determine-build-system.outputs.build_system == 'legacy'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Legacy build notification
+      run: |
+        echo "⚠️ Building with LEGACY hugo-base system"
+        echo "========================================"
+        echo "Module: ${{ env.MODULE_NAME }}"
+        echo "Reason: ${{ env.FORCE_HUGO_BASE == 'true' && 'Emergency fallback activated' || 'No valid module.json found' }}"
+        echo ""
+        echo "🔄 This workflow will call the legacy build-module.yml"
+
+    - name: Trigger legacy workflow
+      run: |
+        echo "🔄 Triggering legacy build-module.yml workflow..."
+
+        # Используем GitHub CLI для запуска legacy workflow
+        gh workflow run build-module.yml \
+          -R info-tech-io/infotecha \
+          -f module_name="${{ env.MODULE_NAME }}" \
+          -f content_repo="${{ env.CONTENT_REPO }}"
+
+        echo "✅ Legacy workflow triggered"
+        echo "🔍 Monitor at: https://github.com/info-tech-io/infotecha/actions"
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+  build-summary:
+    needs: [determine-build-system, build-with-hugo-templates, build-with-hugo-base]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Build summary report
+      run: |
+        echo "📊 Build Module v2 - Execution Summary"
+        echo "======================================"
+        echo "Module: ${{ env.MODULE_NAME }}"
+        echo "Content Repository: ${{ env.CONTENT_REPO }}"
+        echo "Build System: ${{ needs.determine-build-system.outputs.build_system }}"
+        echo "Force Legacy: ${{ env.FORCE_HUGO_BASE }}"
+        echo ""
+
+        if [ "${{ needs.determine-build-system.outputs.build_system }}" = "modern" ]; then
+          echo "🎯 Hugo Template Factory Framework"
+          echo "  Template: ${{ needs.determine-build-system.outputs.hugo_template }}"
+          echo "  Theme: ${{ needs.determine-build-system.outputs.hugo_theme }}"
+          echo "  Components: ${{ needs.determine-build-system.outputs.hugo_components }}"
+          echo "  Hugo Templates Job: ${{ needs.build-with-hugo-templates.result }}"
+        else
+          echo "⚠️ Legacy Hugo-base System"
+          echo "  Legacy Job: ${{ needs.build-with-hugo-base.result }}"
+        fi
+
+        echo ""
+        echo "🌐 Module URL: https://${{ needs.determine-build-system.outputs.module_subdomain }}.infotecha.ru"
+        echo "📅 Completed: $(date -Iseconds)"
